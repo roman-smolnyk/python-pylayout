@@ -151,6 +151,8 @@ class Layout:
 
         if "us" in layouts:
             layouts["en"] = layouts.pop("us")
+        if "ua" in layouts:
+            layouts["uk"] = layouts.pop("ua")
         return layouts
 
     def _subprocess_execute(self, command, shell=False):
