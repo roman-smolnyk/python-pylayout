@@ -41,13 +41,18 @@ class Layout:
             result = ctypes.windll.user32.GetKeyboardLayout(tid)
 
             layouts = {v: k for k, v in self.cached_layouts.items()}
-            return layouts[result]
+            layout = layouts[result]
             # dictionary[new_key] = dictionary.pop(old_key)
         elif "linux" in sys.platform:
             get_current_layout_command = "imports.ui.status.keyboard.getInputSourceManager().currentSource.id"
             command = self._ubuntu_call.format(command=get_current_layout_command)
             result = self._subprocess_execute(command)
-            return re.findall('"(.*)"', result)[0]
+            layout = re.findall('"(.*)"', result)[0]
+            # Convert names
+
+        layout = "en" if layout == "us" else layout
+        layout = "uk" if layout == "ua" else layout
+        return layout
 
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'ru', 'us' etc"""
