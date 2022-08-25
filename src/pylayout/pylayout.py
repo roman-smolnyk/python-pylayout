@@ -157,9 +157,9 @@ class Layout:
         # Convert lang names and persist order
         adapted_layouts = {}
         for key, value in layouts.items():
-            new_key = "en" if key == "us" else key
-            new_key = "uk" if key == "ua" else key
-            adapted_layouts[new_key] = value
+            key = "en" if key == "us" else key
+            key = "uk" if key == "ua" else key
+            adapted_layouts[key] = value
         return adapted_layouts
 
     def _subprocess_execute(self, command, shell=False):
