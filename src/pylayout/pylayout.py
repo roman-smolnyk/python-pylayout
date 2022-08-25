@@ -49,13 +49,10 @@ class Layout:
             result = self._subprocess_execute(command)
             layout = re.findall('"(.*)"', result)[0]
 
-        # Convert lang names and persist order
-        adapted_layouts = {}
-        for key, value in layouts.items():
-            new_key = "en" if key == "us" else key
-            new_key = "uk" if key == "ua" else key
-            adapted_layouts[new_key] = value
-        return adapted_layouts
+        # Convert lang names
+        layout = "en" if layout == "us" else layout
+        layout = "uk" if layout == "ua" else layout
+        return layout
 
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'ru', 'us' etc"""
@@ -157,11 +154,13 @@ class Layout:
             for key, value in result_dict.items():
                 layouts[value["id"]] = int(key)
 
-        if "us" in layouts:
-            layouts["en"] = layouts.pop("us")
-        if "ua" in layouts:
-            layouts["uk"] = layouts.pop("ua")
-        return layouts
+        # Convert lang names and persist order
+        adapted_layouts = {}
+        for key, value in layouts.items():
+            new_key = "en" if key == "us" else key
+            new_key = "uk" if key == "ua" else key
+            adapted_layouts[new_key] = value
+        return adapted_layouts
 
     def _subprocess_execute(self, command, shell=False):
         if isinstance(command, str):

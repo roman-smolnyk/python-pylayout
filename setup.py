@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="pylayout",
-    version="0.0.5",
+    version="0.0.6",
     license="MIT",
     author="Roman Smolnyk",
     author_email="poma23324@gmail.com",
