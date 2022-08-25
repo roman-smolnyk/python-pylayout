@@ -48,11 +48,14 @@ class Layout:
             command = self._ubuntu_call.format(command=get_current_layout_command)
             result = self._subprocess_execute(command)
             layout = re.findall('"(.*)"', result)[0]
-            # Convert names
 
-        layout = "en" if layout == "us" else layout
-        layout = "uk" if layout == "ua" else layout
-        return layout
+        # Convert lang names and persist order
+        adapted_layouts = {}
+        for key, value in layouts.items():
+            new_key = "en" if key == "us" else key
+            new_key = "uk" if key == "ua" else key
+            adapted_layouts[new_key] = value
+        return adapted_layouts
 
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'ru', 'us' etc"""
