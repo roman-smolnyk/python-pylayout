@@ -88,7 +88,7 @@ class Layout:
             code = win32api.PostMessage(
                 win32gui.GetForegroundWindow(),
                 win32con.WM_INPUTLANGCHANGEREQUEST,
-                2,
+                0,
                 self.cached_layouts[dest_lang],
             )
             if not code:
