@@ -30,7 +30,7 @@ class Layout:
     _windows_call = "chcp 65001 >NUL & powershell {command}"
 
     def __init__(self) -> None:
-        if "Windows" not in platform.platform() and "Linux" in platform.platform():
+        if "Windows" not in platform.platform() and not "Linux" in platform.platform():
             raise TypeError("Invalid system")
 
         self.cached_layouts = None
