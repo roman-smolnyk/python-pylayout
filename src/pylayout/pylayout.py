@@ -25,8 +25,10 @@ def bun_ruscists(lang: str):
         sys.exit()
 
 
-def adapt_lang_codes(key: str):
+def adapt_lang_codes(key: str, invert=False):
     codes = {"us": "en", "ua": "uk"}
+    if invert:
+        codes = {v: k for k, v in codes.items()}
     code = codes.get(key)
     return code if code else key
 
@@ -119,7 +121,14 @@ class Layout:
             else:
                 url = "https://askubuntu.com/questions/1412130/dbus-calls-to-gnome-shell-dont-work-under-ubuntu-22-04"
                 print("WARNING:", url)
-                return False
+
+                if False:  # It changes layout to desired one but breaks default Ubuntu's functionality
+                    command = f"setxkbmap {adapt_lang_codes(dest_lang, invert=True)}"
+                    result = self._subprocess_execute(command)
+                    if "Error" in result:
+                        return False
+                    else:
+                        return True
 
     def toggle(self):
         """Cycle through available layouts"""
