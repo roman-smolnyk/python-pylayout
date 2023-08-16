@@ -19,10 +19,16 @@ if "Windows" in platform.platform():
 from ._lang_layouts import LAYOUTS
 
 
-def ban_ruscists(lang: str):
+def bun_ruscists(lang: str):
     if lang == "ru":
         print("Glory to Ukraine!!!")
         sys.exit()
+
+
+def adapt_lang_codes(key: str):
+    codes = {"us": "en", "ua": "uk"}
+    code = codes.get(key)
+    return code if code else key
 
 
 class Layout:
@@ -60,18 +66,22 @@ class Layout:
             get_current_layout_command = "imports.ui.status.keyboard.getInputSourceManager().currentSource.id"
             command = self._ubuntu_call.format(command=get_current_layout_command)
             result = self._subprocess_execute(command)
-            layout = re.findall('"(.*)"', result)[0]
+            if "true" in result:
+                layout = re.findall('"(.*)"', result)[0]
+            else:
+                command = "gsettings get org.gnome.desktop.input-sources mru-sources"
+                result = self._subprocess_execute(command)
+                pre_result = re.findall(r"\(.*?\)", result)[0]
+                layout = re.findall(r"'(.*?)'", pre_result)[1]
 
-        # Convert lang names
-        layout = "en" if layout == "us" else layout
-        layout = "uk" if layout == "ua" else layout
+        layout = adapt_lang_codes(layout)
 
-        ban_ruscists(layout)
+        bun_ruscists(layout)
         return layout
 
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'uk', 'us' etc"""
-        ban_ruscists(dest_lang)
+        bun_ruscists(dest_lang)
         if not self.cached_layouts:
             self.cached_layouts = self._get_available()
         if "Windows" in platform.platform():
@@ -104,8 +114,12 @@ class Layout:
             set_layout_command = f"imports.ui.status.keyboard.getInputSourceManager().inputSources[{self.cached_layouts[dest_lang]}].activate()"
             command = self._ubuntu_call.format(command=set_layout_command)
             result = self._subprocess_execute(command)
-            # TODO Analyze result for success
-            return True
+            if "true" in result:
+                return True
+            else:
+                url = "https://askubuntu.com/questions/1412130/dbus-calls-to-gnome-shell-dont-work-under-ubuntu-22-04"
+                print("WARNING:", url)
+                return False
 
     def toggle(self):
         """Cycle through available layouts"""
@@ -197,19 +211,24 @@ class Layout:
             get_layouts_command = "imports.ui.status.keyboard.getInputSourceManager().inputSources"
             command = self._ubuntu_call.format(command=get_layouts_command)
             result = self._subprocess_execute(command)
-            result_dict = json.loads(re.findall(r"\{.*\}", result)[0])
-            for key, value in result_dict.items():
-                layouts[value["id"]] = int(key)
+            if "true" in result:
+                result_dict = json.loads(re.findall(r"\{.*\}", result)[0])
+                for key, value in result_dict.items():
+                    layouts[value["id"]] = int(key)
+                adapted_layouts = {}
+                for key, value in layouts.items():
+                    key = adapt_lang_codes(key)
+                    adapted_layouts[key] = value
+                layouts = adapted_layouts
+            else:
+                command = "gsettings get org.gnome.desktop.input-sources sources"
+                result = self._subprocess_execute(command)
+                for i in re.findall(r"'(.*?)'", result)[1::2]:
+                    i = adapt_lang_codes(i)
+                    layouts[i] = i
             pass
 
-        # Convert lang names and persist order
-        adapted_layouts = {}
-        for key, value in layouts.items():
-            key = "en" if key == "us" else key
-            key = "uk" if key == "ua" else key
-            adapted_layouts[key] = value
-
-        return adapted_layouts
+        return layouts
 
     def _subprocess_execute(self, command, shell=False):
         if isinstance(command, list):
