@@ -48,13 +48,27 @@ class Layout:
             if not self.cached_layouts:
                 self.cached_layouts = self._get_available()
 
-            # Using ctypes as it probably faster but I'm not sure
-            hwnd = ctypes.windll.user32.GetForegroundWindow()
-            tid = ctypes.windll.user32.GetWindowThreadProcessId(hwnd, 0)
-            result = ctypes.windll.user32.GetKeyboardLayout(tid)
+            hwnd = win32gui.GetForegroundWindow()
+            thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            hkl = win32api.GetKeyboardLayout(thread_id)
+            import pygetwindow
+
+            for window in pygetwindow.getAllWindows():
+                if window._hWnd == hwnd:
+                    break
+            else:
+                raise Exception("No window assosiated with console")
 
             layouts = {v: k for k, v in self.cached_layouts.items()}
-            layout = layouts[result]
+            try:
+                layout = layouts[hkl]
+            except:
+                klid = hex(hkl & 0xFFFFF)
+                for key, value in layouts.items():
+                    key_klid = hex(key & 0xFFFFF)
+                    if klid[-3:] == key_klid[-3:]:
+                        layout = value
+                        break
             # dictionary[new_key] = dictionary.pop(old_key)
         elif "Linux" in platform.platform():
             get_current_layout_command = "imports.ui.status.keyboard.getInputSourceManager().currentSource.id"
@@ -181,7 +195,8 @@ class Layout:
                 # win32api.LoadKeyboardLayout(v.split(":")[1], win32con.KLF_ACTIVATE)
                 # win32api.GetKeyboardLayout(0)
                 # thread_id = ctypes.windll.user32.GetWindowThreadProcessId(win32gui.GetForegroundWindow(), None)
-                thread_id, process_id = win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())
+                hwnd = win32gui.GetForegroundWindow()
+                thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
                 hkl = win32api.GetKeyboardLayout(thread_id)
                 klid = hex(hkl & 0xFFFFF)
                 # to_hex = hex(hkl)
