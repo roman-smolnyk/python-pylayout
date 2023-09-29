@@ -59,13 +59,14 @@ class Layout:
             hwnd = win32gui.GetForegroundWindow()
             thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
             hkl = win32api.GetKeyboardLayout(thread_id)
-            import pygetwindow
 
-            for window in pygetwindow.getAllWindows():
-                if window._hWnd == hwnd:
-                    break
-            else:
-                raise Exception("No window assosiated with console")
+            # import pygetwindow
+
+            # for window in pygetwindow.getAllWindows():
+            #     if window._hWnd == hwnd:
+            #         break
+            # else:
+            #     raise Exception("No window assosiated with console")
 
             layouts = {v: k for k, v in self.cached_layouts.items()}
             try:
