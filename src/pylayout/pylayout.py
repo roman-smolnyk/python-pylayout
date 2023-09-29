@@ -202,6 +202,7 @@ class Layout:
                     pair = l.split(" : ")
                     if "LanguageTag" in pair[0]:
                         key = pair[1].strip().lower()[-2:]
+                        key = adapt_lang_codes(key)
                     elif "InputMethodTips" in pair[0]:
                         layouts[key] = pair[1].strip().replace("{", "").replace("}", "")
                         break
