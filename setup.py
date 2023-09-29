@@ -14,5 +14,5 @@ setup(
     install_requires=[
         "pywin32; platform_system=='Windows'",
     ],
-    description="Get/Set keyboard layout"
+    description="Get/Set keyboard layout",
 )
