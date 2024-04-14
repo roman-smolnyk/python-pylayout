@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pylayout"
+version = "0.1.0"
+authors = [
+  { name="Roman Smolnyk", email="poma23324@gmail.com" },
+]
+description = "Module to get and set keyboard layout"
+readme = "README.md"
+requires-python = ">=3.8" # Optional
+keywords = ["keyboard", "layout"] # Optional
+classifiers = [  # Optional
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "pywin32; platform_system=='Windows'",
+]
+
+[project.urls]  # Optional
+Homepage = "https://gitlab.com/roman-smolnyk/pylayout"
+

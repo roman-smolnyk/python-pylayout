@@ -37,11 +37,12 @@ class Layout:
     _ubuntu_call = "gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval '{command}'"
     _windows_call = "chcp 65001 >NUL & powershell {command}"
 
-    def __init__(self) -> None:
+    def __init__(self, use_cache=True) -> None:
         if "Windows" not in platform.platform() and not "Linux" in platform.platform():
             raise TypeError("Invalid system")
 
-        self.cached_layouts = None
+        self.use_cache = use_cache
+        self.layouts = None
 
         try:
             sys.stdin.reconfigure(encoding="utf-8")
@@ -53,8 +54,8 @@ class Layout:
     def get(self) -> str:
         """Return current layout as 'uk', 'us' etc"""
         if "Windows" in platform.platform():
-            if not self.cached_layouts:
-                self.cached_layouts = self._get_available()
+            if self.use_cache == False or not self.layouts:
+                self.layouts = self._get_available_layouts()
 
             hwnd = win32gui.GetForegroundWindow()
             thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
@@ -68,16 +69,9 @@ class Layout:
             # else:
             #     raise Exception("No window assosiated with console")
 
-            layouts = {v: k for k, v in self.cached_layouts.items()}
-            try:
-                layout = layouts[hkl]
-            except:
-                klid = hex(hkl & 0xFFFFF)
-                for key, value in layouts.items():
-                    key_klid = hex(key & 0xFFFFF)
-                    if klid[-3:] == key_klid[-3:]:
-                        layout = value
-                        break
+            layouts_reversed = {v: k for k, v in self.layouts.items()}
+            layout = layouts_reversed[hkl]
+
             # dictionary[new_key] = dictionary.pop(old_key)
         elif "Linux" in platform.platform():
             get_current_layout_command = "imports.ui.status.keyboard.getInputSourceManager().currentSource.id"
@@ -99,8 +93,9 @@ class Layout:
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'uk', 'us' etc"""
         bun_ruscists(dest_lang)
-        if not self.cached_layouts:
-            self.cached_layouts = self._get_available()
+        if self.use_cache == False or not self.layouts:
+            self.layouts = self._get_available_layouts()
+
         if "Windows" in platform.platform():
             # Cache result to speed up
 
@@ -116,7 +111,7 @@ class Layout:
                 win32gui.GetForegroundWindow(),
                 win32con.WM_INPUTLANGCHANGEREQUEST,
                 0,
-                self.cached_layouts[dest_lang],
+                self.layouts[dest_lang],
             )
             if not code:
                 return True
@@ -128,7 +123,9 @@ class Layout:
             # ActivateKeyboardLayout.restype = wintypes.HKL
             # ActivateKeyboardLayout(self.available()[dest_lang], 0)
         elif "Linux" in platform.platform():
-            set_layout_command = f"imports.ui.status.keyboard.getInputSourceManager().inputSources[{self.cached_layouts[dest_lang]}].activate()"
+            set_layout_command = (
+                f"imports.ui.status.keyboard.getInputSourceManager().inputSources[{self.layouts[dest_lang]}].activate()"
+            )
             command = self._ubuntu_call.format(command=set_layout_command)
             result = self._subprocess_execute(command)
             if "true" in result:
@@ -152,10 +149,10 @@ class Layout:
 
     def list(self) -> list:
         """Return list of available layouts"""
-        if not self.cached_layouts:
-            self.cached_layouts = self._get_available()
+        if self.use_cache == False or not self.layouts:
+            self.layouts = self._get_available_layouts()
         # tuple_ = win32api.GetKeyboardLayoutList()
-        return list(self.cached_layouts.keys())
+        return list(self.layouts.keys())
 
     @staticmethod
     def translate(text: str, source_lang: str, dest_lang: str) -> str:
@@ -184,15 +181,10 @@ class Layout:
                 language = (key, value)
         return language[0]
 
-    # def _available_mapped(self):
-    #     if "win32" not in sys.platform:
-    #         return
-    #     # Converts KLID into HKL
-    #     layouts = self._get_available()
-
-    def _get_available(self) -> dict:
+    def _get_available_layouts(self) -> dict:
         layouts = {}
         if "Windows" in platform.platform():
+            layouts_klid = {}
             # returns KLID
             command = self._windows_call.format(command="Get-WinUserLanguageList")
             result = self._subprocess_execute(command, shell=True)
@@ -205,7 +197,7 @@ class Layout:
                         key = pair[1].strip().lower()[-2:]
                         key = adapt_lang_codes(key)
                     elif "InputMethodTips" in pair[0]:
-                        layouts[key] = pair[1].strip().replace("{", "").replace("}", "")
+                        layouts_klid[key] = pair[1].strip().replace("{", "").replace("}", "")
                         break
             # l = ctypes.windll.user32.GetKeyboardLayout(0)
             # z = gw.getActiveWindow()
@@ -215,8 +207,9 @@ class Layout:
             # l2 = ctypes.windll.user32.GetKeyboardLayout(0)
             # z._hWnd
 
-            # Convert KLID into HKL
-            for i in range(len(layouts.items())):
+            # Get HKL layout values
+            layouts_hkl = {}
+            while True:
                 # win32api.LoadKeyboardLayout(v.split(":")[1], win32con.KLF_ACTIVATE)
                 # win32api.GetKeyboardLayout(0)
                 # thread_id = ctypes.windll.user32.GetWindowThreadProcessId(win32gui.GetForegroundWindow(), None)
@@ -226,13 +219,28 @@ class Layout:
                 klid = hex(hkl & 0xFFFFF)
                 # to_hex = hex(hkl)
                 # to_int = int(to_hex, 16)
-                for k, v in layouts.copy().items():
-                    if isinstance(v, str) and klid[-4:] == v.split(":")[0]:
-                        layouts[k] = hkl
-                        break
+                if hkl in list(layouts_hkl.keys()):
+                    break
+                else:
+                    layouts_hkl[hkl] = klid
                 self.toggle()
                 time.sleep(0.1)  # Need timeout to change layout
-            pass
+
+            # Len can differ because there is a bug in Windows that I have 2 ukrainian layouts
+            # assert len(layouts_klid) == len(layouts_hkl)
+
+            # Convert KLID into HKL
+            for hkl, klid1 in layouts_hkl.items():
+                for lang, klid2 in layouts_klid.items():
+                    if klid1[-5:] == klid2[-5:]:
+                        layouts[lang] = hkl
+                        break
+                    # English language is not too precise
+                    elif klid1[-3:] == klid2[-3:] and not layouts.get(lang):
+                        layouts[lang] = hkl
+                        break
+
+            return layouts
         elif "Linux" in platform.platform():
             get_layouts_command = "imports.ui.status.keyboard.getInputSourceManager().inputSources"
             command = self._ubuntu_call.format(command=get_layouts_command)
@@ -252,9 +260,7 @@ class Layout:
                 for i in re.findall(r"'(.*?)'", result)[1::2]:
                     i = adapt_lang_codes(i)
                     layouts[i] = i
-            pass
-
-        return layouts
+            return layouts
 
     def _subprocess_execute(self, command, shell=False):
         if isinstance(command, list):

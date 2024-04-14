@@ -10,7 +10,7 @@ from src.pylayout import Layout
 
 
 def test():
-    layout = Layout()
+    layout = Layout(use_cache=False)
     lang = layout.get()
     print("Initial layout:", lang)
     print("Layout after initialization:", layout.get())
