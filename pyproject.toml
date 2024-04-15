@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pylayout"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
   { name="Roman Smolnyk", email="poma23324@gmail.com" },
 ]

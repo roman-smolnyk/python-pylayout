@@ -6,6 +6,8 @@ import shlex
 import subprocess
 import sys
 import time
+import winreg
+from pathlib import Path
 
 if "Windows" in platform.platform():
     import ctypes
@@ -72,6 +74,14 @@ class Layout:
             layouts_reversed = {v: k for k, v in self.layouts.items()}
             layout = layouts_reversed[hkl]
 
+            # klid_1 = hex(hkl & 0xFFFFF)
+            # for lang, klid_2 in self.layouts.items():
+            #     if klid_1[-4:] == klid_2[-4:]:
+            #         layout = lang
+            #         break
+            # else:
+            #     raise Exception("Missing KLID")
+
             # dictionary[new_key] = dictionary.pop(old_key)
         elif "Linux" in platform.platform():
             get_current_layout_command = "imports.ui.status.keyboard.getInputSourceManager().currentSource.id"
@@ -107,6 +117,8 @@ class Layout:
             # lid_hex = hex(lid)
             # Needs HKL
             # win32api.PostMessage(ctypes.windll.user32.GetForegroundWindow(), 0x0050, 2, self.cached_layouts[dest_lang])
+
+            # hkl = win32api.LoadKeyboardLayout(self.layouts[dest_lang], win32con.KLF_ACTIVATE)
             code = win32api.PostMessage(
                 win32gui.GetForegroundWindow(),
                 win32con.WM_INPUTLANGCHANGEREQUEST,
@@ -181,24 +193,93 @@ class Layout:
                 language = (key, value)
         return language[0]
 
+    def _get_all_layouts(self) -> dict:
+        assert "Windows" in platform.platform(), "Windows specific"
+
+        all_layouts = {}
+
+        path = Path(r"SYSTEM\CurrentControlSet\Control\Keyboard Layouts")
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, str(path))
+        num_subkeys, num_values, _ = winreg.QueryInfoKey(key)
+        for i in range(num_subkeys):
+            subkey_name = winreg.EnumKey(key, i)
+            subkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, str(path / subkey_name))
+            num_subkeys1, num_values1, _ = winreg.QueryInfoKey(subkey)
+            value_data, value_type = winreg.QueryValueEx(subkey, "Layout Text")
+            all_layouts[subkey_name] = value_data
+            # for j in range(num_values1):
+            #     value_name, value_data, value_type = winreg.EnumValue(subkey, j)
+            #     if value_name == "Layout Text":
+            #         all_layouts[subkey_name] = value_data
+            #         break
+            winreg.CloseKey(subkey)
+        winreg.CloseKey(key)
+
+        return all_layouts
+
+    def _get_preffered_layouts(self) -> list:
+        assert "Windows" in platform.platform(), "Windows specific"
+
+        preffered_layouts = []
+
+        path = Path(r"Keyboard Layout\Preload")
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, str(path))
+        num_subkeys, num_values, _ = winreg.QueryInfoKey(key)
+
+        for i in range(num_values):
+            value_name, value_data, value_type = winreg.EnumValue(key, i)
+            preffered_layouts.append(value_data)
+        winreg.CloseKey(key)
+
+        return preffered_layouts
+
+    def _get_preffered_layouts_with_lang(self) -> dict:
+        layouts_klid = {}
+        all_layouts = self._get_all_layouts()
+        preffered_layouts = self._get_preffered_layouts()
+        for klid in preffered_layouts:
+            layouts_klid[klid] = all_layouts.get(klid)
+        return layouts_klid
+
+    def _get_preffered_layouts_with_lang_2(self) -> dict:
+        """This method is slow so previously I used caching"""
+        layouts_klid = {}
+        # returns KLID
+        command = self._windows_call.format(command="Get-WinUserLanguageList")
+        result = self._subprocess_execute(command, shell=True)
+        all_data = result.strip().split("\r\n\r")
+        for data in all_data:
+            line = data.split("\r\n")
+            for l in line:
+                pair = l.split(" : ")
+                if "LanguageTag" in pair[0]:
+                    key = pair[1].strip().lower()[-2:]
+                    key = adapt_lang_codes(key)
+                elif "InputMethodTips" in pair[0]:
+                    layouts_klid[key] = pair[1].strip().replace("{", "").replace("}", "")
+                    break
+        return layouts_klid
+
+    def _get_preffered_layouts_with_lang_3(self) -> dict:
+        """This registry key can hold irrelevant klid unlike 'Preload' key"""
+        layouts_klid = {}
+        path = Path(r"Control Panel\International\User Profile")
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, str(path))
+        num_subkeys, num_values, _ = winreg.QueryInfoKey(key)
+
+        for i in range(num_subkeys):
+            subkey_name = winreg.EnumKey(key, i)
+            subkey = winreg.OpenKey(winreg.HKEY_CURRENT_USER, str(path / subkey_name))
+            value_name, value_data, value_type = winreg.EnumValue(subkey, 2)
+            layouts_klid[value_name] = subkey_name.split("-")[0].lower().strip()
+            winreg.CloseKey(subkey)
+        winreg.CloseKey(key)
+
+        return layouts_klid
+
     def _get_available_layouts(self) -> dict:
         layouts = {}
         if "Windows" in platform.platform():
-            layouts_klid = {}
-            # returns KLID
-            command = self._windows_call.format(command="Get-WinUserLanguageList")
-            result = self._subprocess_execute(command, shell=True)
-            all_data = result.strip().split("\r\n\r")
-            for data in all_data:
-                line = data.split("\r\n")
-                for l in line:
-                    pair = l.split(" : ")
-                    if "LanguageTag" in pair[0]:
-                        key = pair[1].strip().lower()[-2:]
-                        key = adapt_lang_codes(key)
-                    elif "InputMethodTips" in pair[0]:
-                        layouts_klid[key] = pair[1].strip().replace("{", "").replace("}", "")
-                        break
             # l = ctypes.windll.user32.GetKeyboardLayout(0)
             # z = gw.getActiveWindow()
             # titles = gw.getAllTitles()
@@ -208,37 +289,53 @@ class Layout:
             # z._hWnd
 
             # Get HKL layout values
-            layouts_hkl = {}
-            while True:
-                # win32api.LoadKeyboardLayout(v.split(":")[1], win32con.KLF_ACTIVATE)
-                # win32api.GetKeyboardLayout(0)
-                # thread_id = ctypes.windll.user32.GetWindowThreadProcessId(win32gui.GetForegroundWindow(), None)
-                hwnd = win32gui.GetForegroundWindow()
-                thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
-                hkl = win32api.GetKeyboardLayout(thread_id)
-                klid = hex(hkl & 0xFFFFF)
-                # to_hex = hex(hkl)
-                # to_int = int(to_hex, 16)
-                if hkl in list(layouts_hkl.keys()):
-                    break
-                else:
-                    layouts_hkl[hkl] = klid
-                self.toggle()
-                time.sleep(0.1)  # Need timeout to change layout
+            # layouts_hkl = {}
+            # while True:
+            #     # win32api.LoadKeyboardLayout(v.split(":")[1], win32con.KLF_ACTIVATE)
+            #     # win32api.GetKeyboardLayout(0)
+            #     # thread_id = ctypes.windll.user32.GetWindowThreadProcessId(win32gui.GetForegroundWindow(), None)
+
+            #     hwnd = win32gui.GetForegroundWindow()
+            #     thread_id, process_id = win32process.GetWindowThreadProcessId(hwnd)
+            #     hkl = win32api.GetKeyboardLayout(thread_id)
+            #     klid = hex(hkl & 0xFFFFF)
+            #     # to_hex = hex(hkl)
+            #     # to_int = int(to_hex, 16)
+            #     if hkl in list(layouts_hkl.keys()):
+            #         break
+            #     else:
+            #         layouts_hkl[hkl] = klid
+            #     self.toggle()
+            #     time.sleep(0.1)  # Need timeout to change layout
 
             # Len can differ because there is a bug in Windows that I have 2 ukrainian layouts
             # assert len(layouts_klid) == len(layouts_hkl)
 
+            layouts_ = win32api.GetKeyboardLayoutList()
+
+            layouts_klid = self._get_preffered_layouts_with_lang_3()
+            layouts_klid = {v: k for k, v in layouts_klid.items()}
+            hkl = win32api.GetKeyboardLayout()  # Get current thread layout
             # Convert KLID into HKL
-            for hkl, klid1 in layouts_hkl.items():
-                for lang, klid2 in layouts_klid.items():
-                    if klid1[-5:] == klid2[-5:]:
-                        layouts[lang] = hkl
-                        break
-                    # English language is not too precise
-                    elif klid1[-3:] == klid2[-3:] and not layouts.get(lang):
-                        layouts[lang] = hkl
-                        break
+            for key, value in layouts_klid.items():
+                layouts[key] = win32api.LoadKeyboardLayout(value.split(":")[1], win32con.KLF_ACTIVATE)
+            # Switch back thread layout
+            klid = layouts_klid.get({v: k for k, v in layouts.items()}.get(hkl)).split(":")[1]
+            win32api.LoadKeyboardLayout(klid, win32con.KLF_ACTIVATE)
+
+            # # layouts_klid = self._get_preffered_layouts_with_lang_2()
+            # # Convert KLID into HKL
+            # for hkl in win32api.GetKeyboardLayoutList():
+            #     klid1 = hex(hkl & 0xFFFFF)
+            #     for lang, klid2 in layouts_klid.items():
+            #         hkl2 = win32api.LoadKeyboardLayout(klid2.split(":")[1], win32con.KLF_ACTIVATE)
+            #         if klid1[-5:] == klid2[-5:]:
+            #             layouts[lang] = hkl
+            #             break
+            #         # English language is not too precise
+            #         elif klid1[-3:] == klid2[-3:] and not layouts.get(lang):
+            #             layouts[lang] = hkl
+            #             break
 
             return layouts
         elif "Linux" in platform.platform():
