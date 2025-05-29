@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import platform
 import re
@@ -6,10 +7,10 @@ import shlex
 import subprocess
 import sys
 import time
-import winreg
 from pathlib import Path
 
 if "Windows" in platform.platform():
+    import winreg
     import ctypes
     import win32api
     import win32con
@@ -20,10 +21,12 @@ if "Windows" in platform.platform():
 
 from ._lang_layouts import LAYOUTS
 
+logger = logging.getLogger(__name__)
 
-def bun_ruscists(lang: str):
+
+def ban_russian_nazi(lang: str):
     if lang == "ru":
-        print("Glory to Ukraine!!!")
+        logger.error("Glory to Ukraine!!!")
         sys.exit()
 
 
@@ -97,12 +100,12 @@ class Layout:
 
         layout = adapt_lang_codes(layout)
 
-        bun_ruscists(layout)
+        ban_russian_nazi(layout)
         return layout
 
     def set(self, dest_lang: str) -> bool:
         """dest_lang: 'uk', 'us' etc"""
-        bun_ruscists(dest_lang)
+        ban_russian_nazi(dest_lang)
         if self.use_cache == False or not self.layouts:
             self.layouts = self._get_available_layouts()
 
@@ -144,7 +147,7 @@ class Layout:
                 return True
             else:
                 url = "https://askubuntu.com/questions/1412130/dbus-calls-to-gnome-shell-dont-work-under-ubuntu-22-04"
-                print("WARNING:", url)
+                logger.warning(f"Check this url and verify if module works: {url}")
 
                 if False:  # It changes layout to desired one but breaks default Ubuntu's functionality
                     command = f"setxkbmap {adapt_lang_codes(dest_lang, invert=True)}"

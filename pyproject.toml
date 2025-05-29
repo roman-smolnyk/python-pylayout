@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pylayout"
-version = "0.1.1"
+version = "0.1.2"
 authors = [
   { name="Roman Smolnyk", email="poma23324@gmail.com" },
 ]
@@ -23,5 +23,5 @@ dependencies = [
 ]
 
 [project.urls]  # Optional
-Homepage = "https://gitlab.com/roman-smolnyk/pylayout"
+Homepage = "https://github.com/roman-smolnyk/python-pylayout.git"
 
